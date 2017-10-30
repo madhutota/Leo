@@ -24,7 +24,7 @@ import java.util.Map;
 public class Permissions {
 
     private static final String TAG = "Permissions";
-    public static String TITLE = "Homeframe ";
+    public static String TITLE = "Leo ";
     public static String MESSAGE = "Without this permission the app is not going to work properly ";
     /**
      * The singleton instance.

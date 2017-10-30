@@ -1,10 +1,13 @@
 package com.leo.utils;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -15,9 +18,12 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.leo.BaseActivity;
+import com.leo.R;
 
 /**
  * Created by madhu on 01-Oct-17.
@@ -210,6 +216,63 @@ public class Utility {
                 .duration(SnackBar.SnackBarDuration.SHORT)
                 .show();
     }*/
+
+    /**
+     * ASSIGN THE STRINGS
+     **/
+    public static String getStrings(Context context, int id) {
+        String value = null;
+        if (context != null && id != -1) {
+            value = context.getResources().getString(id);
+        }
+        return value;
+    }
+
+    @SuppressLint("SetTextI18n")
+    public static Dialog showNetworkConnectDialog(final BaseActivity context) {
+
+
+        final Dialog mDialog = new Dialog(context);
+        mDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        mDialog.setContentView(R.layout.network_check);
+        mDialog.getWindow().setBackgroundDrawable(
+                new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        mDialog.setCanceledOnTouchOutside(false);
+        mDialog.setCancelable(true);
+
+        if (context.alertDialog != null) {
+            context.alertDialog.dismiss();
+            context.alertDialog = null;
+        }
+        context.alertDialog = mDialog;
+
+        TextView tv_alert_dialog_title = (TextView) mDialog.findViewById(R.id.tv_alert_dialog_title);
+
+
+        tv_alert_dialog_title.setText(getStrings(context, R.string.app_name));
+
+        TextView tv_dialog_content = (TextView) mDialog.findViewById(R.id.tv_dialog_content);
+
+        tv_dialog_content.setText(getStrings(context, R.string.no_internet_msg_main));
+
+
+        Button btn_dialog_cancel = (Button) mDialog.findViewById(R.id.btn_dialog_cancel);
+        btn_dialog_cancel.setText("OK");
+        btn_dialog_cancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mDialog.dismiss();
+            }
+        });
+
+
+        Button btn_dialog_ok = (Button) mDialog.findViewById(R.id.btn_dialog_ok);
+        btn_dialog_ok.setVisibility(View.GONE);
+
+
+        mDialog.show();
+        return mDialog;
+    }
 
 
 }

@@ -5,23 +5,22 @@
     android:layout_height="match_parent"
     android:background="@drawable/background"
     android:orientation="vertical">
+
     <TextView
         android:id="@+id/tv_speech_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:layout_marginTop="20dp"
+        android:gravity="center"
         android:textColor="@color/colorAccent"
         android:textSize="18sp" />
 
-
-    <!--w-->
-
     <com.skyfishjy.library.RippleBackground
         android:id="@+id/rippleBackground"
-        android:layout_below="@+id/tv_speech_text"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@+id/tv_speech_text"
         app:rb_color="#64FFDA"
         app:rb_duration="3000"
         app:rb_radius="28dp"
@@ -35,10 +34,24 @@
             android:layout_centerInParent="true"
             android:layout_gravity="center"
             android:layout_marginBottom="20dp"
+            android:background="@drawable/circle"
             android:gravity="center"
             android:text="@string/mic_icon"
             android:textColor="@color/colorAccent"
             android:textSize="40sp" />
+
+        <TextView
+            android:id="@+id/tv_tp_on_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/tv_icon_leo"
+            android:layout_centerInParent="true"
+            android:layout_gravity="center"
+            android:layout_marginTop="5dp"
+            android:text="@string/tap_on_mic"
+            android:textColor="@color/colorAccent"
+            android:textSize="18sp"
+            android:textStyle="normal" />
     </com.skyfishjy.library.RippleBackground>
 
 

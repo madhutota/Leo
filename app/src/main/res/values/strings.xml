@@ -1,4 +1,15 @@
 <resources>
     <string name="app_name">Leo</string>
     <string name="etSearchHint">Speech Hint</string>
+    <string name="default_label">Alarm</string>
+    <string name="menu_item_help">Help</string>
+    <string name="tap_on_mic">Tap on mic to speak</string>
+    <string name="txt_cd" />
+    <string name="no_internet_title">No internet</string>
+    <string name="no_internet_msg_main">This Application required internet connection.
+        Please check your internet setting and try again.</string>
+    <string name="no_date">Unable to get the data from the server.</string>
+    <string name="txt_cancel">Cancel</string>
+    <string name="txt_ok">Ok</string>
+
 </resources>
