@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -40,6 +41,18 @@ public class Utility {
     /*Get Font Awesome Web font Type face*/
     public static Typeface setFontAwesomeWebfont(Context context) {
         return Typeface.createFromAsset(context.getAssets(), "fonts/fontawesome-webfont.ttf");
+    }
+
+    public static Typeface setTypeFace_Lato_Bold(Context context) {
+        return Typeface.createFromAsset(context.getAssets(), "fonts/Lato-Bold.ttf");
+    }
+
+    public static Typeface setTypeFace_Lato_Italic(Context context) {
+        return Typeface.createFromAsset(context.getAssets(), "fonts/Lato-Italic.ttf");
+    }
+
+    public static Typeface setTypeFace_Lato_Regular(Context context) {
+        return Typeface.createFromAsset(context.getAssets(), "fonts/Lato-Regular.ttf");
     }
 
 
@@ -272,6 +285,17 @@ public class Utility {
 
         mDialog.show();
         return mDialog;
+    }
+/*PROGRESS BAR*/
+
+    public static float dp2px(Resources resources, float dp) {
+        final float scale = resources.getDisplayMetrics().density;
+        return  dp * scale + 0.5f;
+    }
+
+    public static float sp2px(Resources resources, float sp){
+        final float scale = resources.getDisplayMetrics().scaledDensity;
+        return sp * scale;
     }
 
 

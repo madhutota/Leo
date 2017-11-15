@@ -6,9 +6,11 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.SearchManager;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -18,17 +20,21 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.AlarmClock;
 import android.provider.ContactsContract;
+import android.provider.Settings;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.Window;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 public class MainActivity extends BaseActivity implements TextToSpeech.OnInitListener, GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener, ActivityCompat.OnRequestPermissionsResultCallback,
@@ -61,8 +68,13 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private TextToSpeech textToSpeech;
+    private TextView tv_tp_on_btn;
     private TextView tv_speech_text;
     private TextView tv_icon_leo;
+
+    // private ArcProgress progressStorage;
+    private int mProgressStatus = 0;
+    int hourChanged;
 
     List<ResolveInfo> pkgAppsList;
 
@@ -78,12 +90,30 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     double latitude;
     double longitude;
+
+    private int finalHour;
+    private int finalMinute;
+
+
+    private String contctNameFromPhone;
+    private String contactNumber;
+    private boolean contactFound = false;
     // list of permissions
 
     ArrayList<String> permissions = new ArrayList<>();
     PermissionUtils permissionUtils;
 
     boolean isPermissionGranted;
+
+
+    //used for register alarm manager
+    PendingIntent pendingIntent;
+    //used to store running alarmmanager instance
+    AlarmManager alarmManager;
+    //Callback function for Alarmmanager event
+    BroadcastReceiver mReceiver;
+
+    Window window;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +122,8 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         Utility.transparentToolbar(this);
         setContentView(R.layout.activity_main);
 
+        window = getWindow();
+
         /*INITIALIZE THE UI*/
         inItUi();
     }
@@ -99,9 +131,11 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     private void inItUi() {
 
+        // Initialize a new IntentFilter instance
+        IntentFilter iFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+
         // check availability of play services
         if (checkPlayServices()) {
-
             // Building the GoogleApi client
             buildGoogleApiClient();
         }
@@ -119,7 +153,6 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
         storeContacts = new ArrayList<>();
         getContactsIntoArrayList();
-        /*sURIMatcher = new UriMatcher(UriMatcher.NO_MATCH);*/
 
 
         calendar = Calendar.getInstance();
@@ -128,7 +161,12 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         AlarmManager alarmMgr = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
 
+        tv_tp_on_btn = (TextView) findViewById(R.id.tv_tp_on_btn);
+        tv_tp_on_btn.setTypeface(Utility.setTypeFace_Lato_Bold(getApplicationContext()));
+
+
         tv_speech_text = (TextView) findViewById(R.id.tv_speech_text);
+        tv_speech_text.setTypeface(Utility.setTypeFace_Lato_Regular(getApplicationContext()));
 
         rippleBackground = (RippleBackground) findViewById(R.id.rippleBackground);
         tv_icon_leo = (TextView) findViewById(R.id.tv_icon_leo);
@@ -147,6 +185,7 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         });
 
     }
+
     /**
      * Method to verify google play services on the device
      */
@@ -253,6 +292,8 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         }
     }
 
+    /**/
+
     public void selectContact() {
         // Start an activity for the user to pick a phone number from contacts
         Intent intent = new Intent(Intent.ACTION_PICK);
@@ -262,8 +303,8 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         }
     }
 
-    // Receiving speech input
-
+    // RECEIVING SPEECH INPUT
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -272,6 +313,7 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         String[] words;
         String firstWord = null;
         String secondWord = null;
+
 
         switch (requestCode) {
             case Constants.REQ_CODE_SPEECH_INPUT: {
@@ -285,34 +327,38 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
                     if (matches.size() == 0) {
                         Toast.makeText(this, "Recognizer not present", Toast.LENGTH_SHORT).show();
                     }
-                    //  hello plsese set 6:30 P.M
-                    Utility.showLog("matches", "matches >>>>>>>>>>" + matches);
                     wordStr = matches.get(0);
+                    if (wordStr.contains("brightness")) {
+                        try {
 
-                    if (wordStr.contains("information")) {
-                        //Toast.makeText(this, "information", Toast.LENGTH_SHORT).show();
-                        informationMenu();
-                        /*SETTING ALARM AT PARTICULAR TIME*/
+                            if (Utility.isMarshmallowOS()) {
+                                if (Settings.System.canWrite(getApplicationContext())) {
+                                    setBrightness(wordStr);
+                                } else {
+                                    Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS)
+                                            .setData(Uri.parse("package:" + getPackageName()))
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    startActivity(intent);
+                                }
+
+                            } else {
+                                setBrightness(wordStr);
+
+                            }
+
+
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                            Utility.showLog("brightness Exception", "" + e);
+
+                        }
+
+
                     } else if (wordStr.trim().contains("location")) {
                         getMyLocation();
 
                     } else if (wordStr.contains("P.M") || wordStr.contains("A.M")
                             || wordStr.contains("a.m") || wordStr.contains("p.m")) {
-
-                        /*  words = wordStr.split(" ");
-
-
-
-                    try {
-                        firstWord = words[0];
-                        secondWord = words[1];
-                    } catch (Exception e) {
-                        e.printStackTrace();
-
-                    }*/
-
-                        //6:30 PM
-
                         String[] timeWord = wordStr.split(" ");
 
                         String time = timeWord[0];
@@ -327,117 +373,99 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
                         // String string = "004-034556";
                         String[] parts = time.split(":");
-                        String hours = parts[0]; // 004
-                        String minutes = parts[1]; //
+                        String hours;
+                        String minutes;
+                        if (parts.length > 1 && parts.length > 0) {
+                            hours = parts[0]; // 004
+                            minutes = parts[1]; //
 
-                        Utility.showLog("Alarm Time", "" + hours + ":" + minutes);
+                        } else if (parts.length == 1) {
+                            hours = parts[0];
+                            minutes = "00";
 
-                        int finalHour = Integer.valueOf(hours);
-                        int finalMinute = Integer.valueOf(minutes);
+                        } else {
+                            hours = "00";
+                            minutes = "00";
+
+                        }
+                        if (TextUtils.isEmpty(minutes)) {
+                            minutes = "00";
+                        } else if (TextUtils.isEmpty(hours)) {
+                            hours = "00";
+
+                        }
+
+                        try {
+                            finalHour = Integer.valueOf(hours);
+                            finalMinute = Integer.valueOf(minutes);
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+
+                        }
+
                         createAlarm("Alarm Setted From Leo App", finalHour, finalMinute, isPmORam);
-                    } else if (wordStr.contains("hey Leo")) {
-                        String findSearchQuery = wordStr.replace("hey Leo", "");
+                    } else if (wordStr.contains("Leo") || wordStr.contains("leo")) {
+                        String findSearchQuery = wordStr.replace("Leo", "");
                         searchDynamicData(findSearchQuery);
-                    } else if (wordStr.contains("Google") || wordStr.equalsIgnoreCase("google")) {
-                        forSearching();
                     } else if (wordStr.contains("contact")) {
                         selectContact();
                         /*CALL SELECT NAME OF THE PHONE*/
                     } else if (wordStr.contains("call")) {
+
+
                         Toast.makeText(this, "call", Toast.LENGTH_SHORT).show();
                         String contactName = wordStr.replace("call", "").trim();
+                        Utility.showLog("Output Contact", "" + contactName);
                         Utility.showLog("Updated Contact name", "" + contactName);
                         for (int i = 0; i < storeContacts.size(); i++) {
-
-                            Utility.showLog("NameAndPhone", storeContacts.get(i).getContactName() + " :" + storeContacts.get(i).getContactPhoneNumber());
-
-                            String contctNameFromPhone = storeContacts.get(i).getContactName();
-
+                            contctNameFromPhone = storeContacts.get(i).getContactName();
                             if (contctNameFromPhone.trim().equalsIgnoreCase(contactName)) {
-
-                                /*SPEAKING CONTACT NAME*/
-                                speakOut("Calling " + contactName);
-                                String contactNumber = storeContacts.get(i).getContactPhoneNumber();
-
-                                String uri = "tel:" + contactNumber.trim();
-                                Intent intent = new Intent(Intent.ACTION_CALL);
-                                intent.setData(Uri.parse(uri));
-                                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-                                    // TODO: Consider calling
-                                    //    ActivityCompat#requestPermissions
-                                    // here to request the missing permissions, and then overriding
-                                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                                    //                                          int[] grantResults)
-                                    // to handle the case where the user grants the permission. See the documentation
-                                    // for ActivityCompat#requestPermissions for more details.
-                                    return;
-                                }
-                                startActivity(intent);
-                            } else {
-
-                                speakOut("Since I am  having  Trouble finding " + contactName + " Go ahead pick contact on Your Contacts Screen ");/* else {
-                                Toast.makeText(this, "There is no Contact Found Named By ::" + contactName, Toast.LENGTH_SHORT).show();
-                                // askSpeechInput("There is no Contact Found Named By ::" + contactName);
-                            }*/
+                                contactNumber = storeContacts.get(i).getContactPhoneNumber();
+                                contactFound = true;
                             }
+                        }
+                        if (contactFound) {
+                            contactFound = false;
+                            speakOut("Calling " + contactName);
+                            String uri = "tel:" + contactNumber.trim();
+                            Intent intent = new Intent(Intent.ACTION_CALL);
+                            intent.setData(Uri.parse(uri));
+                            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                                // TODO: Consider calling
+                                //    ActivityCompat#requestPermissions
+                                // here to request the missing permissions, and then overriding
+                                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                //                                          int[] grantResults)
+                                // to handle the case where the user grants the permission. See the documentation
+                                // for ActivityCompat#requestPermissions for more details.
+                                return;
+                            }
+
+                            startActivity(intent);
+
+                        } else {
+                            String numberNotFountText = "Since I am  having  Trouble finding " + contactName + " Go ahead pick contact on Your Contacts Screen ";
+                            textToSpeech.speak(numberNotFountText, TextToSpeech.QUEUE_FLUSH, null);
 
 
                         }
 
+
                     }
 
 
-                    // open open music
 
-
-                  /*  words = wordStr.split(" ");
-
-
-
-                    try {
-                        firstWord = words[0];
-                        secondWord = words[1];
-                    } catch (Exception e) {
-                        e.printStackTrace();
-
-                    }*/
 
                     /*OPEN APPS USING OPEN AND APP NAME */
-
-                    // if (firstWord.equalsIgnoreCase("open")) {
-                    Utility.showLog("Open text", "Open text" + wordStr
-                    );
-
-
-                    /*if (wordStr.contains("music") || wordStr.contains("Google Play Music")) {
-
-                        Intent it = new Intent(Intent.ACTION_VIEW);
-                        Uri uri = MediaStore.Audio.Media.INTERNAL_CONTENT_URI;
-                        // Uri uri = Uri.withAppendedPath(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, "1");
-                        //Uri uri = Uri.parse("file:///sdcard/song.mp3");
-                        it.setDataAndType(uri, "audio/mp3");
-                        startActivity(it);
-
-                       *//* Uri uri = Uri.withAppendedPath(MediaStore.Audio.Media.INTERNAL_CONTENT_URI, "1");
-                        Intent it = new Intent(Intent.ACTION_VIEW, uri);
-                        startActivity(it);*//*
-
-                    }*/
                     if (wordStr.contains("open")) {
                         String appName = wordStr.replace("open", "");
 
                         Utility.showLog("appName", "" + appName);
 
                         if (appName.equalsIgnoreCase("my location")) {
-
-
+                            /*GETTING PRESENT LOCATION*/
                             getMyLocation();
                         }
-
-                       /* if (appName.trim().contains("music")) {
-                            MediaPlayer mediaPlayer = new MediaPlayer();
-                            mediaPlayer.start();
-                        }*/
                         PackageManager packageManager = getPackageManager();
                         List<PackageInfo> packs = packageManager
                                 .getInstalledPackages(0);
@@ -460,11 +488,18 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
                                     } catch (Exception e) {
                                     }
                                 }
+                            } else {
+                                if (!Objects.equals(appName, ""))
+                                    speakOut(appName + "Application is not Available ");
+                                else
+                                    speakOut("Application is not Available ");
+
                             }
                         }
-                    } else if (wordStr.contains("set")) {
+                    } else if (wordStr.contains("alarm")) {
                         askSpeechInput("At What Time?");
-                        //createAlarm("Good Mornig",6,50,true);
+                    } else {
+
                     }
                 }
                 break;
@@ -519,6 +554,75 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
                 }
                 break;
         }
+
+    }
+
+    private void finalBrightnessForOutput(Context context, int number) {
+
+        try {
+            android.provider.Settings.System.putInt(
+                    context.getContentResolver(),
+                    android.provider.Settings.System.SCREEN_BRIGHTNESS, number);
+
+
+            android.provider.Settings.System.putInt(context.getContentResolver(),
+                    android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+
+            android.provider.Settings.System.putInt(
+                    context.getContentResolver(),
+                    android.provider.Settings.System.SCREEN_BRIGHTNESS,
+                    number);
+
+
+        } catch (Exception e) {
+            Log.e("Screen Brightness", "error changing screen brightness");
+        }
+
+
+      /*  Settings.System.putInt(this.getContentResolver(),
+                Settings.System.SCREEN_BRIGHTNESS, number);
+
+        startActivity(new Intent(this, MainActivity.class));*/
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    private void setBrightness(String wordStr) {
+
+        String number = wordStr.replaceAll("[^0-9]+", "");
+
+        Utility.showLog("Number", "Number >>>>>" + number);
+        if (!Utility.isValueNullOrEmpty(number)) {
+            speakOut("brightness setted at " + number + "%");
+
+            if (Objects.equals(number, "")) {
+                number = "127";
+                finalBrightnessForOutput(this.getApplicationContext(), Integer.parseInt(number));
+
+            } else {
+                if (Integer.parseInt(number) <= 100) {
+                    int calculateNumber = Math.round(Integer.parseInt(number) * 255) / 100;
+                    finalBrightnessForOutput(this.getApplicationContext(), calculateNumber);
+
+                    //  finalBrightnessForOutput(calculateNumber);
+                   /* Settings.System.putInt(
+                            getApplicationContext().getContentResolver(),
+                            Settings.System.SCREEN_BRIGHTNESS,
+                            calculateNumber);
+                    Settings.System.putInt(getApplicationContext().getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, calculateNumber
+                    );*/
+                } else {
+                    number = "255";
+                    finalBrightnessForOutput(this.getApplicationContext(), Integer.parseInt(number));
+                    //finalBrightnessForOutput(Integer.parseInt(number));
+                    /*Settings.System.putInt(getApplicationContext().getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, Integer.parseInt(number)
+                    );*/
+                }
+
+            }
+        } else
+            speakOut("Sorry I am unable  to process your request");
     }
 
     @Override
@@ -537,58 +641,42 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     }
 
-    private void forSearching() {
+    public void
+    createAlarm(String message, int hour, int minutes, boolean isPm) {
+        String opISPm;
+        /* calendar.set(Calendar.AM_PM, hour < 12 ? Calendar.AM : Calendar.PM);
 
-        Intent intent = getIntent();
-        String action = intent.getAction();
-        if (action.equals(Intent.ACTION_SEARCH)) {
-            String query = intent.getStringExtra(SearchManager.QUERY);
-            // handleVoiceQuery(query);
+        int am_pm = calendar.get(Calendar.AM_PM);
+        String time = calendar.HOUR + ((am_pm == Calendar.AM) ? "am" : "pm"))*/
+        if (isPm) {
+            if (hour == 12) {
+                hour = 0;
+            }
+            hourChanged = hour + 12;
+
+            opISPm = "P.M";
+
+        } else {
+            hourChanged = hour;
+            opISPm = "A.M";
         }
-    }
-
-    public void informationMenu() {
-
-        Intent intent = new Intent(this, MainActivity.class);
-        PendingIntent alarmIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-
-
-        calendar.set(Calendar.HOUR_OF_DAY, 8);
-        calendar.set(Calendar.MINUTE, 30);
-
-
-        // startActivity(new Intent("android.content.Intent.EXTRA_TEXT"));
-
-
-    }
-
-    public void createAlarm(String message, int hour, int minutes, boolean isPm) {
-
-        Utility.showLog("OPPM OR AM", "" + isPm);
-        Intent intent = new Intent(AlarmClock.ACTION_SET_ALARM)
+        Intent alarmIntent = new Intent(AlarmClock.ACTION_SET_ALARM)
                 .putExtra(AlarmClock.EXTRA_MESSAGE, message)
-                .putExtra(AlarmClock.EXTRA_HOUR, hour)
-                .putExtra(AlarmClock.EXTRA_IS_PM, isPm)
+                .putExtra(AlarmClock.EXTRA_HOUR, hourChanged)
                 .putExtra(AlarmClock.EXTRA_MINUTES, minutes);
 
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            String opISPm;
+        if (alarmIntent.resolveActivity(getPackageManager()) != null) {
 
-            if (isPm) {
-                opISPm = "P.M";
+            if (hour == 0) {
+                speakOut("Alarm Setted At" + 12 + ":" + minutes + "P.M");
             } else {
-                opISPm = "A.M";
-
+                speakOut("Alarm Setted At" + hour + ":" + minutes + opISPm);
             }
-            speakOut("Alarm Setted At" + hour + ":" + minutes + opISPm);
-            startActivity(intent);
+
+            startActivity(alarmIntent);
         }
     }
 
-    public void getAlarm() {
-
-
-    }
 
     public void getContactsIntoArrayList() {
 
@@ -642,7 +730,7 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
                     || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Log.e("TTS", "This Language is not supported");
             } else {
-                speakOut("Hey Leo");
+                speakOut(Utility.getStrings(getApplicationContext(), R.string.wake_up));
             }
 
         } else {
@@ -666,70 +754,20 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         } else {
             textToSpeech.speak("Couldn't get the location. Make sure location is enabled on the device", TextToSpeech.QUEUE_FLUSH, null);
         }
-
-
-
-
-
-      /*  Location location = appLocationService
-                .getLocation(LocationManager.GPS_PROVIDER);*/
-
-        //you can hard-code the lat & long if you have issues with getting it
-        //remove the below if-condition and use the following couple of lines
-        //double latitude = 37.422005;
-        //double longitude = -122.084095
-
-       /* if (location != null) {
-            double latitude = location.getLatitude();
-            double longitude = location.getLongitude();
-            LocationAddress locationAddress = new LocationAddress();
-            locationAddress.getAddressFromLocation(latitude, longitude,
-                    getApplicationContext(), new GeocoderHandler());
-        } else {
-            showSettingsAlert();
-        }*/
     }
 
     public void getAddress() {
-
         Address locationAddress = getAddress(latitude, longitude);
 
         if (locationAddress != null) {
             String address = locationAddress.getAddressLine(0);
-            String address1 = locationAddress.getAddressLine(1);
-            String city = locationAddress.getLocality();
-            String state = locationAddress.getAdminArea();
-            String country = locationAddress.getCountryName();
-            String postalCode = locationAddress.getPostalCode();
 
             String currentLocation;
 
             if (!TextUtils.isEmpty(address)) {
                 currentLocation = address;
-
-                if (!TextUtils.isEmpty(address1))
-                    currentLocation += "\n" + address1;
-
-                if (!TextUtils.isEmpty(city)) {
-                    currentLocation += "\n" + city;
-
-                    if (!TextUtils.isEmpty(postalCode))
-                        currentLocation += " - " + postalCode;
-                } else {
-                    if (!TextUtils.isEmpty(postalCode))
-                        currentLocation += "\n" + postalCode;
-                }
-
-                if (!TextUtils.isEmpty(state))
-                    currentLocation += "\n" + state;
-
-                if (!TextUtils.isEmpty(country))
-                    currentLocation += "\n" + country;
-
-
-                tv_speech_text.setText(currentLocation);
                 tv_speech_text.setVisibility(View.VISIBLE);
-
+                tv_speech_text.setText(currentLocation);
                 textToSpeech.speak(currentLocation, TextToSpeech.QUEUE_FLUSH, null);
 
             }
@@ -738,6 +776,7 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     }
 
+    /*FOR ADDRESS*/
     public Address getAddress(double latitude, double longitude) {
         Geocoder geocoder;
         List<Address> addresses;
@@ -756,9 +795,7 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
     }
 
     private void getLocation() {
-
         if (isPermissionGranted) {
-
             try {
                 mLastLocation = LocationServices.FusedLocationApi
                         .getLastLocation(mGoogleApiClient);
@@ -770,11 +807,10 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
 
     }
 
-
     @Override
     public void onConnected(@Nullable Bundle bundle) {
 
-        // Once connected with google api, get the location
+        // ONCE CONNECTED WITH GOOGLE API, GET THE LOCATION
         getLocation();
 
     }
@@ -818,4 +854,17 @@ public class MainActivity extends BaseActivity implements TextToSpeech.OnInitLis
         Log.i("PERMISSION", "NEVER ASK AGAIN");
 
     }
+
+    private void UnregisterAlarmBroadcast() {
+        alarmManager.cancel(pendingIntent);
+        getBaseContext().unregisterReceiver(mReceiver);
+    }
+
+    @Override
+    protected void onDestroy() {
+        //unregisterReceiver(mReceiver);
+        super.onDestroy();
+    }
+
+
 }

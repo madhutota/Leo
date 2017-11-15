@@ -9,7 +9,7 @@ public class Constants {
     // Log message On or Off
     public static final boolean logMessageOnOrOff = true;
 
-    public static int SPLASH_TIME_OUT = 3000;
+    public static int SPLASH_TIME_OUT = 2000;
 
     public static final int REQ_CODE_SPEECH_INPUT = 100;
     public static final  int PLAY_SERVICES_REQUEST = 1000;

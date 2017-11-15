@@ -11,5 +11,7 @@
     <string name="no_date">Unable to get the data from the server.</string>
     <string name="txt_cancel">Cancel</string>
     <string name="txt_ok">Ok</string>
+    <string name="wake_up">Hey Im Leo and Im here to help you do things</string>
+
 
 </resources>

@@ -10,4 +10,6 @@
     <color name="green">#00BFA5</color>
 
     <color name="dialog_divider_line">#c1bfbf</color>
+    <color name="storage_color">#009688</color>
+    <color name="red_color">#F44336</color>
 </resources>

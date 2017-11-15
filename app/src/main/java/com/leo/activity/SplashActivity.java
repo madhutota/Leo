@@ -19,6 +19,7 @@ import com.leo.utils.Utility;
 
 public class SplashActivity extends BaseActivity {
 
+    private static final Integer SETTINGS = 0x7;
     private ImageView iv_spalash;
 
 
@@ -27,8 +28,14 @@ public class SplashActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setTheme(R.style.AppTheme_NoActionBar);
-        Utility.transparentToolbar(this);
+        Utility.transparentToolbar(
+                this);
         setContentView(R.layout.activity_splash);
+/*
+        if (Utility.isMarshmallowOS()) {
+            askForPermission(Manifest.permission.WRITE_SETTINGS, SETTINGS);
+
+        }*/
 
         if (Utility.isMarshmallowOS()) {
             Permissions.getInstance().setActivity(this);
@@ -36,10 +43,8 @@ public class SplashActivity extends BaseActivity {
                     Manifest.permission.RECORD_AUDIO,
                     Manifest.permission.SET_ALARM,
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
                     Manifest.permission.READ_EXTERNAL_STORAGE,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.CALL_PHONE,
                     Manifest.permission.READ_CONTACTS,
                     Manifest.permission.WRITE_CONTACTS);
 
@@ -59,10 +64,8 @@ public class SplashActivity extends BaseActivity {
                         resultSet.isPermissionGranted(Manifest.permission.RECORD_AUDIO) &&
                         resultSet.isPermissionGranted(Manifest.permission.SET_ALARM) &&
                         resultSet.isPermissionGranted(Manifest.permission.ACCESS_FINE_LOCATION) &&
-                        resultSet.isPermissionGranted(Manifest.permission.ACCESS_COARSE_LOCATION) &&
                         resultSet.isPermissionGranted(Manifest.permission.READ_EXTERNAL_STORAGE) &&
                         resultSet.isPermissionGranted(Manifest.permission.WRITE_EXTERNAL_STORAGE) &&
-                        resultSet.isPermissionGranted(Manifest.permission.CALL_PHONE) &&
                         resultSet.isPermissionGranted(Manifest.permission.READ_CONTACTS) &&
                         resultSet.isPermissionGranted(Manifest.permission.WRITE_CONTACTS)) {
                     iniTUI();
